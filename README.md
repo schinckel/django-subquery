@@ -2,11 +2,11 @@
 
 Backport of https://github.com/django/django/pull/6478 to support legacy Django versions.
 
-Installation:
+## Installation:
 
     $ pip install django-subquery
 
-Usage:
+## Usage:
 
 Given the model structure below:
 
@@ -32,3 +32,9 @@ We can write some queries to get some really nice results:
 
     >>> hottest_new_books = Book.objects.filter(publisher=OuterRef('pk')).order_by('-publication_date', '-price')
     >>> Publisher.objects.annotate(hot_title=hottest_new_books.values('title'))
+
+## Supported versions:
+
+This package has been mildly tested with Django 1.8.
+
+This is only an interim package, until the referenced PR has been merged.
