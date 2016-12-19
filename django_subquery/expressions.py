@@ -25,6 +25,9 @@ class OuterRef(F):
         raise FieldError(
             'This queryset contains an unresolved reference to an outer query, and may not be evaluated.')
 
+    def _prepare(self, output_field=None):
+        return self
+
 
 class SubQuery(Expression):
     """
@@ -36,41 +39,59 @@ class SubQuery(Expression):
     def __init__(self, subquery, output_field=None, **extra):
         self.subquery = subquery.all()
         self.extra = extra
-        if output_field is None:
-            if len(self.subquery.query.select) == 1:
-                output_field = self.subquery.query.select[0].field
+        if output_field is None and len(self.subquery.query.select) == 1:
+            output_field = self.subquery.query.select[0].field
         super(SubQuery, self).__init__(output_field)
+
+    def copy(self):
+        clone = super(SubQuery, self).copy()
+        # Also create a new copy of the subquery.
+        clone.subquery = clone.subquery.all()
+        return clone
 
     def resolve_expression(self, query=None, allow_joins=True, reuse=None, summarize=False, for_save=False):
         clone = self.copy()
         clone.is_summary = summarize
-        # Copy the subquery, because we will be modifying it.
-        clone.subquery = clone.subquery.all()
         clone.subquery.query.bump_prefix(query)
 
         # Need to recursively resolve these.
-        def resolve(child):
+        def resolve_all(child):
             if hasattr(child, 'children'):
-                [resolve(_child) for _child in child.children]
-            if hasattr(child, 'rhs') and isinstance(child.rhs, F):
-                child.rhs = child.rhs.resolve_expression(query, allow_joins, reuse, summarize, for_save)
+                [resolve_all(_child) for _child in child.children]
+            if hasattr(child, 'rhs'):
+                child.rhs = resolve(child.rhs)
 
-        resolve(clone.subquery.query.where)
+        def resolve(child):
+            if hasattr(child, 'resolve_expression'):
+                return child.resolve_expression(
+                    query=query, allow_joins=allow_joins, reuse=reuse, summarize=summarize,
+                    for_save=for_save)
+            return child
+
+        resolve_all(clone.subquery.query.where)
+
+        for key, value in clone.subquery.query.annotations.items():
+            if isinstance(value, SubQuery):
+                clone.subquery.query.annotations[key] = resolve(value)
+
         return clone
 
     def get_source_expressions(self):
         return [x for x in [getattr(expr, 'lhs', None) for expr in self.subquery.query.where.children] if x]
 
-    def set_source_expressions(self, exprs):
-        self.subquery = exprs
+    def relabeled_clone(self, change_map):
+        clone = self.copy()
+        clone.subquery.query = clone.subquery.query.relabeled_clone(change_map)
+        clone.subquery.query.external_aliases.update(
+            alias for alias in change_map.values() if alias not in clone.subquery.query.tables)
+        return clone
 
     def as_sql(self, compiler, connection, template=None, **extra_context):
         connection.ops.check_expression_support(self)
         template_params = self.extra.copy()
         template_params.update(extra_context)
 
-        template_params['subquery'], sql_params = self.subquery.query.get_compiler(connection=connection)\
-                                                                     .as_sql()
+        template_params['subquery'], sql_params = self.subquery.query.get_compiler(connection=connection).as_sql()
 
         template = template or template_params.get('template', self.template)
         sql = template % template_params
