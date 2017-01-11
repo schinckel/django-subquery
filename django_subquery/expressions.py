@@ -11,7 +11,9 @@ class ResolvedOuterRef(F):
     """
     def as_sql(self, *args, **kwargs):
         raise ValueError(
-            'This queryset contains a reference to an outer query, and may only be used in a subquery.')
+            'This queryset contains a reference to an outer query, and may '
+            'only be used in a subquery.'
+        )
 
     def _prepare(self, output_field=None):
         return self
@@ -19,11 +21,15 @@ class ResolvedOuterRef(F):
 
 class OuterRef(F):
     def resolve_expression(self, query=None, allow_joins=True, reuse=None, summarize=False, for_save=False):
+        if isinstance(self.name, self.__class__):
+            return self.name
         return ResolvedOuterRef(self.name)
 
     def as_sql(self, *args, **kwargs):
         raise FieldError(
-            'This queryset contains an unresolved reference to an outer query, and may not be evaluated.')
+            'This queryset contains an unresolved reference to an outer query, '
+            'and may not be evaluated.'
+        )
 
     def _prepare(self, output_field=None):
         return self
@@ -37,7 +43,7 @@ class SubQuery(Expression):
     template = '(%(subquery)s)'
 
     def __init__(self, subquery, output_field=None, **extra):
-        self.subquery = subquery.all()
+        self.subquery = subquery
         self.extra = extra
         if output_field is None and len(self.subquery.query.select) == 1:
             output_field = self.subquery.query.select[0].field
@@ -99,12 +105,14 @@ class SubQuery(Expression):
         return sql, sql_params
 
     def _prepare(self, output_field):
-        # If we are the rhs in a subquery, we want to remove the wrapping ()
+        # This method will only be called if this instance is the "rhs" in an
+        # expression: the wrapping () must be removed (as the expression that
+        # contains this will provide them). SQLite will evaluate ((subquery))
+        # differently to the other engines.
         if self.template == '(%(subquery)s)':
             clone = self.copy()
             clone.template = '%(subquery)s'
             return clone
-
         return self
 
 
@@ -123,9 +131,9 @@ class Exists(SubQuery):
         return fields.BooleanField()
 
     def resolve_expression(self, query=None, **kwargs):
-        # By definition, an EXISTS does not care about the columns, so the query can
-        # be simplified down to the primary key.
-        self.subquery = self.subquery.values('pk').order_by()
+        # By definition, an EXISTS does not care about the ordering, just that
+        # a single one will match. So we ensure that there is no ordering.
+        self.subquery = self.subquery.order_by()
         return super(Exists, self).resolve_expression(query, **kwargs)
 
     def as_sql(self, compiler, connection, template=None, **extra_context):
