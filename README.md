@@ -1,6 +1,6 @@
 # django-subquery
 
-Backport of https://github.com/django/django/pull/6478 to support legacy Django versions.
+Backport of https://docs.djangoproject.com/en/dev/ref/models/expressions/#subquery-expressions to support legacy Django versions.
 
 ## Installation:
 
@@ -8,33 +8,22 @@ Backport of https://github.com/django/django/pull/6478 to support legacy Django 
 
 ## Usage:
 
-Given the model structure below:
+Please see the official Django documentation: https://docs.djangoproject.com/en/dev/ref/models/expressions/#subquery-expressions
 
-    from django.db import models
-    from django_subquery.expressions import SubQuery, OuterRef
-
-    class Publisher(models.Model):
-        name = models.CharField(max_length=30)
-        # ...
-
-    class Author(models.Model):
-        name = models.CharField(max_length=200)
-        # ...
-
-    class Book(models.Model):
-        title = models.CharField(max_length=100)
-        authors = models.ManyToManyField('Author')
-        publisher = models.ForeignKey(Publisher, on_delete=models.CASCADE)
-        publication_date = models.DateField()
-        price = models.DecimalField()
-
-We can write some queries to get some really nice results:
-
-    >>> hottest_new_books = Book.objects.filter(publisher=OuterRef('pk')).order_by('-publication_date', '-price')
-    >>> Publisher.objects.annotate(hot_title=hottest_new_books.values('title'))
+Note that you need to import from ``django_subquery.expressions`` instead of ``django.db.models``.
 
 ## Supported versions:
 
 This package has been mildly tested with Django 1.8.
 
 This is only an interim package, until the referenced PR has been merged.
+
+## Unsupported features:
+
+This package is not likely to work on Oracle, as that required some backend within django to work.
+
+## Upgrading from < 1.0
+
+The main class used to be called ``SubQuery``, but was renamed ``Subquery`` when merged into Django 1.11.
+
+You'll need to adjust your code accordingly.
