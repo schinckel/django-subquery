@@ -14,9 +14,7 @@ Note that you need to import from ``django_subquery.expressions`` instead of ``d
 
 ## Supported versions:
 
-This package has been mildly tested with Django 1.8.
-
-This is only an interim package, until the referenced PR has been merged.
+This package is in production use with Django 1.8, but should work with any version of Django from 1.8 onwards.
 
 ## Unsupported features:
 
