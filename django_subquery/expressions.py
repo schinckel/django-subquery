@@ -107,7 +107,7 @@ class Subquery(Expression):
         sql = connection.ops.unification_cast_sql(self.output_field) % sql
         return sql, sql_params
 
-    def _prepare(self, output_field):
+    def _prepare(self, output_field=None):
         # This method will only be called if this instance is the "rhs" in an
         # expression: the wrapping () must be removed (as the expression that
         # contains this will provide them). SQLite evaluates ((subquery))
