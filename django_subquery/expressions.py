@@ -66,7 +66,7 @@ class Subquery(Expression):
                     query=query, allow_joins=allow_joins, reuse=reuse,
                     summarize=summarize, for_save=for_save,
                 )
-                if hasattr(resolved, 'alias'):
+                if hasattr(resolved, 'alias') and resolved.alias != resolved.target.model._meta.db_table:
                     clone.queryset.query.external_aliases.add(resolved.alias)
                 return resolved
             return child
